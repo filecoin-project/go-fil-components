@@ -135,6 +135,8 @@ func (pde *providerDealEnvironment) Node() retrievalmarket.RetrievalProviderNode
 }
 
 func (pde *providerDealEnvironment) ReadIntoBlockstore(storeID multistore.StoreID, pieceData io.ReadCloser) error {
+	log.Debugf("will ReadIntoBlockstore now, storeID=%d", storeID)
+
 	// Get the the destination multistore
 	store, loadErr := pde.p.multiStore.Get(storeID)
 	if loadErr != nil {
@@ -172,6 +174,8 @@ func (pde *providerDealEnvironment) ReadIntoBlockstore(storeID multistore.StoreI
 		log.Error(err.Error())
 		return err
 	}
+
+	log.Debugf("ReadIntoBlockstore completed successfully, storeID=%d", storeID)
 
 	return nil
 }

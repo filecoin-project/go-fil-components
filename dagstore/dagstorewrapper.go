@@ -19,7 +19,7 @@ import (
 // the other parts of go-fil-markets
 type DagStoreWrapper interface {
 	// RegisterShard loads a CAR file into the DAG store and builds an index for it
-	RegisterShard(ctx context.Context, pieceCid cid.Cid, carPath string) error
+	RegisterShard(ctx context.Context, pieceCid cid.Cid, carPath string, eagerInit bool) error
 	// LoadShard fetches the data for a shard and provides a blockstore interface to it
 	LoadShard(ctx context.Context, pieceCid cid.Cid) (carstore.ClosableBlockstore, error)
 }
@@ -28,6 +28,8 @@ type dagStoreWrapper struct {
 	dagStore *dagstore.DAGStore
 	mountApi LotusMountAPI
 }
+
+var _ DagStoreWrapper = (*dagStoreWrapper)(nil)
 
 func NewDagStoreWrapper(dsRegistry *mount.Registry, dagStore *dagstore.DAGStore, mountApi LotusMountAPI) (*dagStoreWrapper, error) {
 	err := dsRegistry.Register(lotusScheme, NewLotusMountTemplate(mountApi))
@@ -75,14 +77,17 @@ func (ds *dagStoreWrapper) LoadShard(ctx context.Context, pieceCid cid.Cid) (car
 	return &closableBlockstore{Blockstore: NewReadOnlyBlockstore(bs), Closer: res.Accessor}, nil
 }
 
-func (ds *dagStoreWrapper) RegisterShard(ctx context.Context, pieceCid cid.Cid, carPath string) error {
+func (ds *dagStoreWrapper) RegisterShard(ctx context.Context, pieceCid cid.Cid, carPath string, eagerInit bool) error {
 	key := shard.KeyFromCID(pieceCid)
 	mt, err := NewLotusMount(pieceCid, ds.mountApi)
 	if err != nil {
 		return xerrors.Errorf("failed to create lotus mount for piece CID %s: %w", pieceCid, err)
 	}
 
-	opts := dagstore.RegisterOpts{ExistingTransient: carPath}
+	opts := dagstore.RegisterOpts{
+		ExistingTransient:  carPath,
+		LazyInitialization: !eagerInit,
+	}
 	resch := make(chan dagstore.ShardResult, 1)
 	err = ds.dagStore.RegisterShard(ctx, key, mt, resch, opts)
 	if err != nil {
